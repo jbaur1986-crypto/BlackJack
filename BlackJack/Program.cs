@@ -29,12 +29,19 @@ public static class PlayerDecision
 
 public static class ComputerDecision
 {
-    
+    public static bool WantsCard(Hand hand)
+    {
+        return hand.Points < 16;
+    }
 }
 
 public static class Rules
 {
-    //Doppelzug und Einfachzug
+    public static bool IsFirstTurn(Hand hand)
+    {
+        return true; //Logik fehlt noch!
+    }
+    //Doppelzug und Einfachzug, Check auf Bust, ggf. Einsätze???
 }
 
 public class PlayerRound

@@ -15,6 +15,8 @@ public static class PlayerDecision
 {
     public static bool WantsCard(Hand hand)
     {
+        if (hand.Points >= 22) return false;
+        
         Console.WriteLine($"Punktestand: {hand.Points}");
         Console.WriteLine("Möchten Sie noch eine Karte ziehen? (j/n)");
         char input = Char.ToLower(Console.ReadKey().KeyChar);

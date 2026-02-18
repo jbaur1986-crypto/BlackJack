@@ -1,74 +1,98 @@
 ﻿using System.ComponentModel;
 
 namespace BlackJack
-{
+                     {
+                     
+                         public enum Color
+                         {
+                             Hearts,
+                             Diamonds,
+                             Spades,
+                             Clubs
+                         }
+                     
+                         public enum Value
+                         {
+                             Two = 2,
+                             Three,
+                             Four,
+                             Five,
+                             Six,
+                             Seven,
+                             Eight,
+                             Nine,
+                             Ten,
+                             Ace,
+                             Jack,
+                             Queen,
+                             King,
+                     
+                         }
+                     
+                         public static class CardSource
+                         {
+                             private static Random zufall = new Random();
+                             private static List<Card> deck = new List<Card>();
+                     
+                             private static void InitDeck()
+                             {
+                                 deck.Clear();
+                                 
+                                 foreach (Color c in Enum.GetValues<Color>())
+                                 {
+                                     foreach (Value v in Enum.GetValues<Value>())
+                                     {
+                                         deck.Add(new Card(c, v));
+                                     }
+                                 }
+                     
+                                 Shuffle();
+                             }
+                     
+                             private static void Shuffle()
+                             {
+                                 //Fisher-Yates-Shuffle
+                                 for (int i = 0; i <= 51; i++)
+                                 {
+                                     int flag = zufall.Next(i, 52);
+                                     Card marked = deck[i];
+                                     
+                                     deck[i] = deck[flag];
+                                     deck[flag] = marked;
+                                 }
+                             }
+                     
+                             static CardSource()
+                             {
+                                 //static Konstruktor initiiert automatisch beim Erstaufruf das Deck; Muss!!!
+                                 InitDeck();
+                             }
 
-    public enum Color
-    {
-        Hearts,
-        Diamonds,
-        Spades,
-        Clubs
-    }
-
-    public enum Value
-    {
-        Two = 2,
-        Three,
-        Four,
-        Five,
-        Six,
-        Seven,
-        Eight,
-        Nine,
-        Ten,
-        Ace,
-        Jack,
-        Queen,
-        King,
-
-    }
-
-    public static class CardSource
-    {
-        private static Random zufall = new Random();
-        private static List<Card> deck = new List<Card>();
-
-        private static void InitDeck()
-        {
-            deck.Clear();
-            
-            foreach (Color c in Enum.GetValues(typeof(Color)))
-            foreach (Value v in Enum.GetValues(typeof(Value)))
-                deck.Add(new Card(c, v));
-
-            Shuffle();
-        }
-
-        private static void Shuffle()
-        {
-            //Fisher-Yates-Shuffle
-        }
-    }
-
-    public class Card
-    {
-        public Color Color { get; }
-        public Value Value { get; }
-
-        public Card (Color color, Value value)
-        {
-            Color = color;
-            Value = value;
-        }
-
-        public override string ToString()
-        {
-            return $"{Value} of {Color}";
-        }
-    }
-
-    public class Hand
+                             public static Card Draw()
+                             {
+                                 // fehlt noch!!!
+                             }
+                             
+                         }
+                     
+                         public class Card
+                         {
+                             public Color Color { get; }
+                             public Value Value { get; }
+                     
+                             public Card (Color color, Value value)
+                             {
+                                 Color = color;
+                                 Value = value;
+                             }
+                     
+                             public override string ToString()
+                             {
+                                 return $"{Value} of {Color}";
+                             }
+                         }
+                     
+                         public class Hand
     {
         public int Points { get; private set; }
 

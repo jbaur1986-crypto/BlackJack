@@ -1,98 +1,112 @@
 ﻿using System.ComponentModel;
 
 namespace BlackJack
-                     {
+{
                      
-                         public enum Color
-                         {
-                             Hearts,
-                             Diamonds,
-                             Spades,
-                             Clubs
-                         }
+    public enum Suit
+    {
+        Hearts,
+        Diamonds,
+        Spades,
+        Clubs
+    }
                      
-                         public enum Value
-                         {
-                             Two = 2,
-                             Three,
-                             Four,
-                             Five,
-                             Six,
-                             Seven,
-                             Eight,
-                             Nine,
-                             Ten,
-                             Ace,
-                             Jack,
-                             Queen,
-                             King,
+    public enum Value
+    {
+        Two = 2,
+        Three,
+        Four,
+        Five,
+        Six,
+        Seven,
+        Eight,
+        Nine,
+        Ten,
+        Ace,
+        Jack,
+        Queen,
+        King,
                      
-                         }
-                     
-                         public static class CardSource
-                         {
-                             private static Random zufall = new Random();
-                             private static List<Card> deck = new List<Card>();
-                     
-                             private static void InitDeck()
-                             {
-                                 deck.Clear();
-                                 
-                                 foreach (Color c in Enum.GetValues<Color>())
-                                 {
-                                     foreach (Value v in Enum.GetValues<Value>())
-                                     {
-                                         deck.Add(new Card(c, v));
-                                     }
-                                 }
-                     
-                                 Shuffle();
-                             }
-                     
-                             private static void Shuffle()
-                             {
-                                 //Fisher-Yates-Shuffle
-                                 for (int i = 0; i <= 51; i++)
-                                 {
-                                     int flag = zufall.Next(i, 52);
-                                     Card marked = deck[i];
-                                     
-                                     deck[i] = deck[flag];
-                                     deck[flag] = marked;
-                                 }
-                             }
-                     
-                             static CardSource()
-                             {
-                                 //static Konstruktor initiiert automatisch beim Erstaufruf das Deck; Muss!!!
-                                 InitDeck();
-                             }
+    }
 
-                             public static Card Draw()
-                             {
-                                 // fehlt noch!!!
-                             }
+                        
+    public class ShoeOfDecks
+    {
+        private readonly Random zufall = new Random(Guid.NewGuid().GetHashCode());// sicherer Seed
+        private List<Card> shoe = new List<Card>();
+        private int counter = 0;
                              
-                         }
+        public ShoeOfDecks(int quantity)
+        {
+            InitShoeOfDecks(quantity);
+        }
                      
-                         public class Card
-                         {
-                             public Color Color { get; }
-                             public Value Value { get; }
+        private void InitShoeOfDecks(int quantity)
+        {
+            if (quantity <= 0) throw new ArgumentOutOfRangeException("Quantity must be at least 1.");
+                                 
+            shoe.Clear();
+            counter = 0;
+                                 
+            int i = 1;
+                                 
+            while (i <= quantity)
+            {
+                foreach (Suit c in Enum.GetValues<Suit>())
+                {
+                    foreach (Value v in Enum.GetValues<Value>())
+                    {
+                        shoe.Add(new Card(c, v));
+                    }
+                }
+
+                i++;
+            }
+
+            Shuffle();
+        }
                      
-                             public Card (Color color, Value value)
-                             {
-                                 Color = color;
-                                 Value = value;
-                             }
+        private void Shuffle()
+        {
+            //Fisher-Yates-Shuffle rauf
+            for (int i = 0; i <= shoe.Count-2; i++)
+            {
+                int flag = zufall.Next(i, shoe.Count);
+                Card marked = shoe[i];
+                shoe[i] = shoe[flag];
+                shoe[flag] = marked;
+            }
+        }
+                             
+
+        public Card Draw()
+        {
+            if (counter >= shoe.Count) throw new InvalidOperationException("No cards available.");
+            counter++;
+            return shoe[counter-1];
+           
+        }
+                             
+    }
                      
-                             public override string ToString()
-                             {
-                                 return $"{Value} of {Color}";
-                             }
-                         }
+    public class Card
+    {
+        public Suit Suit { get; }
+        public Value Value { get; }
                      
-                         public class Hand
+        public Card (Suit suit, Value value)
+        {
+            Suit = suit;
+            Value = value;
+        }
+                     
+        public override string ToString()
+        {
+            return $"{Value} of {Suit}";
+        }
+    }
+                     
+    public class Hand
     {
         public int Points { get; private set; }
 

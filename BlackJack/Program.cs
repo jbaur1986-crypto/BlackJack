@@ -32,9 +32,9 @@ namespace BlackJack
                         
     public class ShoeOfDecks
     {
-        private readonly Random zufall = new Random(Guid.NewGuid().GetHashCode());// sicherer Seed
+        private int counter;
         private List<Card> shoe = new List<Card>();
-        private int counter = 0;
+        private readonly Random zufall = new Random(Guid.NewGuid().GetHashCode());// sicherer Seed
                              
         public ShoeOfDecks(int quantity)
         {
@@ -44,12 +44,12 @@ namespace BlackJack
         private void InitShoeOfDecks(int quantity)
         {
             if (quantity <= 0) throw new ArgumentOutOfRangeException("Quantity must be at least 1.");
-                                 
-            shoe.Clear();
+            
             counter = 0;
-                                 
             int i = 1;
-                                 
+            
+            shoe.Clear();      
+            
             while (i <= quantity)
             {
                 foreach (Suit c in Enum.GetValues<Suit>())
@@ -105,7 +105,8 @@ namespace BlackJack
             return $"{Value} of {Suit}";
         }
     }
-                     
+     ///////////////////////////////////////////////////////// Oben Refactored, unten alt.
+     /* 
     public class Hand
     {
         public int Points { get; private set; }
@@ -182,13 +183,17 @@ namespace BlackJack
     {
         //PlayPlayerRound, ComputerRound, EvaluateWinLoss
     }
-
-
+    */
+     
     class Program
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello, World!");
+            ShoeOfDecks shoe1 = new ShoeOfDecks(1);
+            foreach (var _ in Enumerable.Range(0, 52))
+            {
+                shoe1.Draw();
+            }
         }
     }
 }

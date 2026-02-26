@@ -119,8 +119,6 @@ namespace BlackJack
        public bool IsBust => OptimalPoints > 21;
        public bool IsBlackJack => OptimalPoints == 21 && hand.Count == 2;
        public bool CanSurrenderLate => (hand.Count == 2 && WasCreatedBySplit == false /* && Dealerhand kein BlackJack */);
-       public bool CanDoubleDown => hand.Count == 2;
-       public bool CanHit => OptimalPoints < 21;
        public bool CanSplitOnce => (hand.Count == 2 && hand[0].Rank == hand[1].Rank && WasCreatedBySplit == false);
        
        public Hand(List<Card> initialCards, bool wasCreatedBySplit = false)
@@ -177,9 +175,26 @@ namespace BlackJack
             hand.Add(card);
         }
        }
+
+   public class Bet
+   {
+       public int Amount { get; }
+       // public Hand BettedHand { get; } //SideBets
+
+       public Bet(int amount /*, Hand hand*/)
+       {
+           if (amount <= 0)
+               throw new ArgumentOutOfRangeException("Bet amount has to be positive.");
+           Amount = amount;
+           // Hand = hand;
+       }
+       
+       
+   }
+   
    ///////////////////////////////////////////////////////// Oben Refactored, unten alt.
 
-       public class Player
+   public class Player
    {
        //player beitzt Hand, Lesbarkeit
    }
@@ -216,21 +231,7 @@ namespace BlackJack
         */
 
    }
-
-
-   public static class Rules
-   {
-       public static bool CanDraw(Hand hand)
-       {
-           return true; //Logik fehlt noch!
-       }
-
-       public static bool IsBust(Hand hand)
-       {
-           return true; //fehlt noch
-       }
-   }
-
+   
 
 
 
@@ -255,11 +256,12 @@ namespace BlackJack
     {
         public static void RunAllTests()
         {
-            ShueTest();
+            ShoeTest();
             HandTest();
+            BetTest();
         }
 
-        private static void ShueTest()
+        private static void ShoeTest()
         {
             //Test 52 cards?
             try
@@ -270,8 +272,7 @@ namespace BlackJack
                     shoe1.Draw();
                 }
 
-                throw new Exception(
-                    "Expected exception not thrown. Should be thrown because of 52 cards and 53 draws.");
+                throw new Exception("Expected exception not thrown. Should be thrown because of 52 cards and 53 draws.");
             }
             catch (InvalidOperationException ex)
             {
@@ -381,14 +382,6 @@ namespace BlackJack
                 throw new Exception("CanSurrenderLate1 doesn't detect properly.");
             Console.WriteLine("Hand - CanSurrenderLate1 test successful.");
             
-            if (a3.CanDoubleDown != true && a4.CanDoubleDown != false)
-                throw new Exception("CanDoubleDown doesn't detect properly.");
-            Console.WriteLine("Hand - CanDoubleDown test successful.");
-            
-            if (a6.CanHit != true && a4.CanHit != false)
-                throw new Exception("CanHit doesn't detect properly.");
-            Console.WriteLine("Hand - CanHit test successful.");
-            
             
             Hand s2 = new Hand(new List<Card>
             {
@@ -419,6 +412,25 @@ namespace BlackJack
                throw new Exception("AddCard() has problems with card content of the added card. ");
             Console.WriteLine("Hand - AddCard() test successful.");
 
+            
+        }
+
+        private static void BetTest()
+        {
+            try
+            {
+                Bet a = new Bet(-3);
+                throw new Exception("Expected Exception not throwm");
+            }
+            catch ( ArgumentOutOfRangeException ex)
+            {
+                if (!ex.Message.Contains("Bet amount has to be positive."))
+                    throw new Exception("Unexpected exception message.");
+            }
+            
+                Bet b = new Bet(2);
+            Console.WriteLine("Bet - test successful.");
+            
             
         }
     }

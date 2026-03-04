@@ -13,7 +13,7 @@ namespace BlackJack
 
     public enum Rank
     {
-        Two = 2,
+        Two ,
         Three,
         Four,
         Five,
@@ -22,15 +22,14 @@ namespace BlackJack
         Eight,
         Nine,
         Ten,
-        Ace,
         Jack,
         Queen,
-        King,
-
+        King, 
+        Ace
     }
 
 
-    public class ShoeOfDecks
+    public sealed class ShoeOfDecks
     {
         private int counter;
         private List<Card> shoe = new List<Card>();
@@ -41,10 +40,7 @@ namespace BlackJack
             InitShoeOfDecks(quantity);
         }
 
-        public IReadOnlyList<Card> Cards //public Property für zb Tests
-        {
-            get { return shoe; }
-        }
+        public IReadOnlyList<Card> Cards => shoe.AsReadOnly(); //AsReadOnly() prevents deleting via casts
 
         private void InitShoeOfDecks(int quantity)
         {
@@ -73,7 +69,7 @@ namespace BlackJack
 
         private void Shuffle()
         {
-            //Fisher-Yates-Shuffle rauf
+            //Fisher-Yates-Shuffle reverse
             for (int i = 0; i <= shoe.Count - 2; i++)
             {
                 int flag = zufall.Next(i, shoe.Count);
@@ -94,15 +90,27 @@ namespace BlackJack
 
     }
 
-    public class Card
+    public readonly record struct Card(Suit Suit, Rank Rank)
     {
-        public Suit Suit { get; }
-        public Rank Rank { get; }
-
-        public Card(Suit suit, Rank rank)
+        public int GetBlackJackValue()
         {
-            Suit = suit;
-            Rank = rank;
+            switch (Rank)
+            {
+                case Rank.Two: return 2;
+                case Rank.Three: return 3;
+                case Rank.Four: return 4;
+                case Rank.Five: return 5;
+                case Rank.Six: return 6;
+                case Rank.Seven: return 7;
+                case Rank.Eight: return 8;
+                case Rank.Nine: return 9;
+                case Rank.Ten:
+                case Rank.Jack:
+                case Rank.Queen:
+                case Rank.King: return 10;
+                case Rank.Ace: return 11;
+                default: throw new ArgumentOutOfRangeException("Card rank not valid. Probably illegal new card added in enum");
+            }
         }
 
         public override string ToString()
@@ -110,100 +118,109 @@ namespace BlackJack
             return $"{Rank} of {Suit}";
         }
     }
-    
-   public class Hand
-   {
-       private readonly List<Card> hand;
-       public int OptimalPoints => CalculateOptimalPoints();
-       public bool WasCreatedBySplit { get; private set; }
-       public bool IsBust => OptimalPoints > 21;
-       public bool IsBlackJack => OptimalPoints == 21 && hand.Count == 2;
-       public bool CanSurrenderLate => (hand.Count == 2 && WasCreatedBySplit == false /* && Dealerhand kein BlackJack */);
-       public bool CanSplitOnce => (hand.Count == 2 && hand[0].Rank == hand[1].Rank && WasCreatedBySplit == false);
-       
-       public Hand(List<Card> initialCards, bool wasCreatedBySplit = false)
-       {
-           if (initialCards == null)
-               throw new ArgumentNullException("initialCards mustn't be null.");
-           
-           hand = new List<Card>(initialCards);
-           WasCreatedBySplit = wasCreatedBySplit;
-       }
-       
-       public IReadOnlyList<Card> Cards //public Property für zb Tests
-       {
-           get { return hand; }
-       }
 
-       private int CalculateOptimalPoints()
-       {
-           int aceCount = 0;
-           int points = 0;
+    public sealed class Hand
+    {
+        private readonly List<Card> hand;
+        public int OptimalPoints => CalculateOptimalPoints();
 
-           foreach (Card card in hand)
-           {
-               switch (card.Rank)
-               {
-                   case Rank.Jack:
-                   case Rank.Queen:
-                   case Rank.King:
-                       points += 10;
-                       break;
-                   case Rank.Ace:
-                       points += 11;
-                       aceCount++;
-                       break;
-                   default:
-                       points += (int)card.Rank;
-                       break;
-               }
-           }
+        public bool IsBust => OptimalPoints > 21;
+        public bool IsBlackJack => OptimalPoints == 21 && hand.Count == 2;
 
-           while (aceCount > 0 && points > 21)
-           {
-               points -= 10;
-               aceCount--;
-           }
-
-           return points;
-       }
-      
-       public void AddCard(Card card)
+        public Hand(List<Card> initialCards)
         {
-            if (card == null)
-                throw new ArgumentNullException("Card added cannot be null."); 
+            if (initialCards == null)
+                throw new ArgumentNullException("initialCards mustn't be null.");
+
+            hand = new List<Card>(initialCards);
+        }
+
+        public IReadOnlyList<Card> Cards //public Property for testing...
+        {
+            get { return hand; }
+        }
+
+        private int CalculateOptimalPoints()
+        {
+            int aceCount = 0;
+            int points = 0;
+
+            foreach (Card card in hand)
+            {
+                if (card.Rank == Rank.Ace)
+                {
+                        points += 11;
+                        aceCount++;
+                }
+                else
+                {
+                     points += card.GetBlackJackValue();
+                }
+            }
+
+            while (aceCount > 0 && points > 21)
+            {
+                points -= 10;
+                aceCount--;
+            }
+
+            return points;
+        }
+
+        public void AddCard(Card card)
+        {
             hand.Add(card);
         }
-       }
+    }
 
-   public class Bet
+    public sealed record class Bet
+    {
+        public int Amount { get; init; }
+        public Hand? BettedHand { get; init; }
+
+        public Bet(int amount, Hand? hand = null)
+        {
+            if (amount <= 0)
+                throw new ArgumentOutOfRangeException("Bet amount has to be positive.");
+            Amount = amount;
+            BettedHand = hand;
+        }
+
+    }
+
+    public sealed class Box
+    {
+        public List<Hand> hands;
+    }
+    ///////////////////////////////////////////////////////// Oben Refactored, unten alt.
+
+    public sealed record class Player
+    {
+        public string Name { get; init; }
+        public decimal Balance { get; private set; }
+        private readonly List<Hand> _hands = new();
+
+        public IReadOnlyList<Hand> Hands 
+        {
+            get { return _hands.AsReadOnly(); }
+        }
+
+
+}
+
+   public interface GameRules
    {
-       public int Amount { get; }
-       // public Hand BettedHand { get; } //SideBets
-
-       public Bet(int amount /*, Hand hand*/)
-       {
-           if (amount <= 0)
-               throw new ArgumentOutOfRangeException("Bet amount has to be positive.");
-           Amount = amount;
-           // Hand = hand;
-       }
-       
-       
+       public bool CanSurrenderLate(Hand hand, Card upcard);
    }
-   
-   ///////////////////////////////////////////////////////// Oben Refactored, unten alt.
 
-   public class Player
+   public static class StandardBJRules
    {
-       //player beitzt Hand, Lesbarkeit
+      
    }
-
-
-   public static class Decisions
+   public sealed class Decisions
    {
        /*
-       public static bool PlayerWantsCard(Hand hand)
+       public bool PlayerWantsCard(Hand hand)
        {
            if (hand.Points >= 22) return false;
 
@@ -219,12 +236,12 @@ namespace BlackJack
            return input == 'j';
        }
 
-       public static bool ComputerWantsCard(Hand hand)
+       public bool ComputerWantsCard(Hand hand)
        {
            return hand.Points < 16;
        }
 
-       public static bool WinLossDecision()
+       public bool WinLossDecision()
        {
            return true; //fehlt
        }
@@ -235,7 +252,7 @@ namespace BlackJack
 
 
 
-   public static class Game
+   public sealed class Game
    {
        //UpCardDealer, PlayPlayerRound, HoleCardDealer, EvaluateWinLoss
    }
@@ -312,7 +329,7 @@ namespace BlackJack
                 new Card(Suit.Diamonds, Rank.Ace), 
                 new Card(Suit.Spades, Rank.Ace),
                 new Card(Suit.Clubs, Rank.Ace)
-            }, true);
+            });
             Hand a2 = new Hand(new List<Card>
             {
                 new Card(Suit.Hearts, Rank.Ace),
@@ -329,7 +346,7 @@ namespace BlackJack
                 new Card(Suit.Hearts, Rank.Seven),
                 new Card(Suit.Diamonds, Rank.Seven), 
                 new Card(Suit.Spades, Rank.Seven)
-            }, true);
+            });
             Hand a5 = new Hand(new List<Card>
             {
                 new Card(Suit.Hearts, Rank.Ten),
@@ -341,7 +358,7 @@ namespace BlackJack
                 new Card(Suit.Diamonds, Rank.Ten), 
                 new Card(Suit.Spades, Rank.Ten),
                 new Card(Suit.Clubs, Rank.Ten)
-            }, true);
+            });
 
             if (a1.OptimalPoints != 14 && a2.OptimalPoints != 21 && a3.OptimalPoints != 21 && a4.OptimalPoints != 21 &&
                 a5.OptimalPoints != 21 && a6.OptimalPoints != 30)
@@ -356,13 +373,13 @@ namespace BlackJack
                 new Card(Suit.Diamonds, Rank.Ten), 
                 new Card(Suit.Diamonds, Rank.Ace),
                 new Card(Suit.Clubs, Rank.Ace)
-            }, true); 
+            }); 
             Hand b2 = new Hand(new List<Card>
             {
                 new Card(Suit.Hearts, Rank.Ace),
                 new Card(Suit.Hearts, Rank.Three), 
                 new Card(Suit.Spades, Rank.Six),
-            }, true);
+            });
 
             if (b1.IsBust != true && b2.IsBust != false)
                 throw new Exception("IsBust doesn't detect properly.");
@@ -376,12 +393,12 @@ namespace BlackJack
             {
                 new Card(Suit.Hearts, Rank.Queen),
                 new Card(Suit.Diamonds, Rank.Queen) 
-            },true);
+            });
 
-            if (a3.CanSurrenderLate != true && s1.CanSurrenderLate != false && a6.CanSurrenderLate != false)
+            /*if (a3.CanSurrenderLate != true && s1.CanSurrenderLate != false && a6.CanSurrenderLate != false)
                 throw new Exception("CanSurrenderLate1 doesn't detect properly.");
             Console.WriteLine("Hand - CanSurrenderLate1 test successful.");
-            
+            */
             
             Hand s2 = new Hand(new List<Card>
             {
@@ -392,18 +409,19 @@ namespace BlackJack
             {
                 new Card(Suit.Hearts, Rank.Queen),
                 new Card(Suit.Diamonds, Rank.King) 
-            },true);
+            });
             
-            if (s2.CanSplitOnce != true && a3.CanSplitOnce != false && s1.CanSplitOnce != false && s3.CanSplitOnce != false)
+            /*if (s2.CanSplitOnce != true && a3.CanSplitOnce != false && s1.CanSplitOnce != false && s3.CanSplitOnce != false)
                 throw new Exception("CanSplitOnce doesn't detect properly.");
             Console.WriteLine("Hand - CanSplitOnce test successful.");
+            */
             
             Hand s4 = new Hand(new List<Card>
             {
                 new Card(Suit.Hearts, Rank.Queen),
                 new Card(Suit.Diamonds, Rank.King),
                 new Card(Suit.Diamonds, Rank.Ace) 
-            },true);
+            });
 
             s3.AddCard(new Card(Suit.Diamonds, Rank.Ace));
            if ( s3.Cards.Count != s4.Cards.Count)

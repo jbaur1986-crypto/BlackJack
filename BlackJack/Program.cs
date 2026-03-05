@@ -1,9 +1,10 @@
 ﻿using System.ComponentModel;
+using System.Linq;
 
 namespace BlackJack
 {
 
-    public enum Suit
+    internal enum Suit
     {
         Hearts,
         Diamonds,
@@ -11,7 +12,7 @@ namespace BlackJack
         Clubs
     }
 
-    public enum Rank
+    internal enum Rank
     {
         Two ,
         Three,
@@ -28,23 +29,33 @@ namespace BlackJack
         Ace
     }
 
+    internal enum Role
+    {
+        Player,
+        Operator
+    }
 
-    public sealed class ShoeOfDecks
+    internal interface IUser
+    {
+        string Name { get;}
+        Role Role { get; }
+    }
+    internal sealed class ShoeOfDecks
     {
         private int counter;
         private List<Card> shoe = new List<Card>();
         private readonly Random zufall = new Random(Guid.NewGuid().GetHashCode()); // sicherer Seed (ggf. redundant)
 
-        public ShoeOfDecks(int quantity)
+        internal ShoeOfDecks(int quantity)
         {
             InitShoeOfDecks(quantity);
         }
 
-        public IReadOnlyList<Card> Cards => shoe.AsReadOnly(); //AsReadOnly() prevents deleting via casts
+        internal IReadOnlyList<Card> Cards => shoe.AsReadOnly(); //AsReadOnly() prevents deleting via casts
 
         private void InitShoeOfDecks(int quantity)
         {
-            if (quantity <= 0) throw new ArgumentOutOfRangeException("Quantity must be at least 1.");
+            if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity),"Quantity must be at least 1.");
 
             counter = 0;
             int i = 1;
@@ -80,7 +91,7 @@ namespace BlackJack
         }
 
 
-        public Card Draw()
+        internal Card Draw()
         {
             if (counter >= shoe.Count) throw new InvalidOperationException("No cards available.");
             counter++;
@@ -90,9 +101,9 @@ namespace BlackJack
 
     }
 
-    public readonly record struct Card(Suit Suit, Rank Rank)
+    internal readonly record struct Card(Suit Suit, Rank Rank)
     {
-        public int GetBlackJackValue()
+        internal int GetBlackJackValue()
         {
             switch (Rank)
             {
@@ -109,35 +120,31 @@ namespace BlackJack
                 case Rank.Queen:
                 case Rank.King: return 10;
                 case Rank.Ace: return 11;
-                default: throw new ArgumentOutOfRangeException("Card rank not valid. Probably illegal new card added in enum");
+                default: throw new ArgumentOutOfRangeException(nameof(Rank),"Card rank not valid. Probably illegal new card added in enum");
             }
         }
 
-        public override string ToString()
+       public override string ToString()
         {
             return $"{Rank} of {Suit}";
         }
     }
 
-    public sealed class Hand
+    internal sealed class Hand
     {
-        private readonly List<Card> hand;
-        public int OptimalPoints => CalculateOptimalPoints();
+        private List<Card> _hand;
+        internal int OptimalPoints => CalculateOptimalPoints();
+        internal IReadOnlyList<Card> Cards => _hand.AsReadOnly();
+        internal bool IsBust => OptimalPoints > 21;
+        internal bool IsBlackJack => OptimalPoints == 21 && _hand.Count == 2;
+        internal bool IsSplittable => _hand.Count == 2 &&_hand[0].Rank == _hand[1].Rank ;
 
-        public bool IsBust => OptimalPoints > 21;
-        public bool IsBlackJack => OptimalPoints == 21 && hand.Count == 2;
-
-        public Hand(List<Card> initialCards)
+        internal Hand(List<Card> initialCards)
         {
             if (initialCards == null)
-                throw new ArgumentNullException("initialCards mustn't be null.");
+                throw new ArgumentNullException(nameof(initialCards),"Initial cards must not be null.");
 
-            hand = new List<Card>(initialCards);
-        }
-
-        public IReadOnlyList<Card> Cards //public Property for testing...
-        {
-            get { return hand; }
+            _hand = new List<Card>(initialCards);
         }
 
         private int CalculateOptimalPoints()
@@ -145,7 +152,7 @@ namespace BlackJack
             int aceCount = 0;
             int points = 0;
 
-            foreach (Card card in hand)
+            foreach (Card card in _hand)
             {
                 if (card.Rank == Rank.Ace)
                 {
@@ -167,57 +174,117 @@ namespace BlackJack
             return points;
         }
 
-        public void AddCard(Card card)
+        internal void AddCard(Card card)
         {
-            hand.Add(card);
+            _hand.Add(card);
         }
+
+        internal Hand SplitHandOver()
+        {
+            Card handOverCard;
+            if (!IsSplittable) throw new InvalidOperationException("No split due to either amount or match of cards.");
+            handOverCard = _hand[1];
+            _hand.RemoveAt(1);
+            List<Card> splitList = new List<Card>();
+            splitList.Add(handOverCard);
+            Hand splitHand = new Hand(splitList);
+            return splitHand;
+        }
+        
     }
 
-    public sealed record class Bet
+    internal sealed class Bet
     {
-        public int Amount { get; init; }
-        public Hand? BettedHand { get; init; }
+        internal decimal Amount { get; init; }
+        internal Hand? BettedHand { get; init; }
 
-        public Bet(int amount, Hand? hand = null)
+        internal Bet(decimal amount, Hand? hand = null)
         {
-            if (amount <= 0)
-                throw new ArgumentOutOfRangeException("Bet amount has to be positive.");
+            if (amount <= 0m)
+                throw new ArgumentOutOfRangeException(nameof(amount),"Bet amount has to be positive.");
             Amount = amount;
             BettedHand = hand;
         }
 
     }
-
-    public sealed class Box
-    {
-        public List<Hand> hands;
-    }
-    ///////////////////////////////////////////////////////// Oben Refactored, unten alt.
-
-    public sealed record class Player
+    internal sealed class Player : IUser
     {
         public string Name { get; init; }
-        public decimal Balance { get; private set; }
-        private readonly List<Hand> _hands = new();
+        public Role Role { get; init; }
+        internal decimal Balance { get; private set; }
 
-        public IReadOnlyList<Hand> Hands 
+        internal Player(string name, decimal balance)
+        {
+            Name = name;
+            Role = Role.Player;
+            Balance = balance;
+        }
+
+        internal void AddBalance(decimal amount)
+        {
+            if (amount < 0m) throw new ArgumentOutOfRangeException(nameof(amount),"Added amount cannot be negative.");
+            Balance += amount;
+        }
+
+        internal void PlaceBet(decimal amount)
+        {
+            if (amount < 0m) throw new ArgumentOutOfRangeException(nameof(amount),"Placed bet cannot be negative.");
+            if (amount > Balance) throw new InvalidOperationException("Not enough balance for bet.");
+            Balance -= amount;
+        }
+    }
+
+    internal sealed class Operator : IUser
+    {
+        public string Name { get; init; }
+        public Role Role { get; init; }
+
+        internal Operator(string name)
+        {
+            Name = name;
+            Role = Role.Operator;
+        }
+    }
+    
+
+    internal sealed class Box
+    {
+        private readonly List<Hand> _hands = new();
+        internal decimal MaxBet { get; private set; }
+
+        internal void SetMaxBet(IUser user, decimal amount)
+        {
+            if (user.Role != Role.Operator) throw new UnauthorizedAccessException("Only operator can change maxbet.");
+            if (amount <0m) throw new ArgumentOutOfRangeException(nameof(amount),"Placed MaxBet cannot be negative.");
+            MaxBet = amount;
+        }
+
+        internal void SplitHand(Hand hand)
+        {
+            if (!hand.IsSplittable)
+                throw new InvalidOperationException("Hand has to contain exact two cards which have equal rank for split.");
+            if (!_hands.Contains(hand)) throw new InvalidOperationException("Box has to contain target hand for split.");
+            Hand newHand = hand.SplitHandOver();
+            _hands.Add(newHand);
+
+        }
+        internal IReadOnlyList<Hand> Hands 
         {
             get { return _hands.AsReadOnly(); }
         }
-
-
-}
-
-   public interface GameRules
+    }
+    
+    ///////////////////////////////////////////////////////// Oben Refactored, unten alt/unfinished.
+   internal interface IGameRules
    {
-       public bool CanSurrenderLate(Hand hand, Card upcard);
+       internal bool CanSurrenderLate(Hand hand, Card upcard);
    }
 
-   public static class StandardBJRules
+   internal static class StandardBjRules
    {
       
    }
-   public sealed class Decisions
+   internal sealed class Decisions
    {
        /*
        public bool PlayerWantsCard(Hand hand)
@@ -252,7 +319,7 @@ namespace BlackJack
 
 
 
-   public sealed class Game
+   internal sealed class Game
    {
        //UpCardDealer, PlayPlayerRound, HoleCardDealer, EvaluateWinLoss
    }
@@ -269,9 +336,9 @@ namespace BlackJack
     }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    public static class Tests
+    internal static class Tests
     {
-        public static void RunAllTests()
+        internal static void RunAllTests()
         {
             ShoeTest();
             HandTest();
@@ -360,8 +427,8 @@ namespace BlackJack
                 new Card(Suit.Clubs, Rank.Ten)
             });
 
-            if (a1.OptimalPoints != 14 && a2.OptimalPoints != 21 && a3.OptimalPoints != 21 && a4.OptimalPoints != 21 &&
-                a5.OptimalPoints != 21 && a6.OptimalPoints != 30)
+            if (a1.OptimalPoints != 14 || a2.OptimalPoints != 21 || a3.OptimalPoints != 21 || a4.OptimalPoints != 21 ||
+                a5.OptimalPoints != 21 || a6.OptimalPoints != 30)
                 throw new Exception("OptimalPoints not calculated properly.");
             Console.WriteLine("Hand - OptimalPoints test successful.");
             

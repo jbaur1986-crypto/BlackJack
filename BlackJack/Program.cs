@@ -35,6 +35,16 @@ namespace BlackJack
         Operator
     }
 
+    internal enum State
+    {
+        Betting,
+        DealerUpCard,
+        PlayerTurn,
+        DealerHoleCard,
+        DealerPlay,
+        Settlement
+    }
+
     internal interface IUser
     {
         string Name { get;}
@@ -42,25 +52,25 @@ namespace BlackJack
     }
     internal sealed class ShoeOfDecks
     {
-        private int counter;
-        private List<Card> shoe = new List<Card>();
-        private readonly Random zufall = new Random(Guid.NewGuid().GetHashCode()); // sicherer Seed (ggf. redundant)
+        private int _counter;
+        private readonly List<Card> _shoe = new List<Card>();
+        private readonly Random _random = new Random(Guid.NewGuid().GetHashCode()); // safe Seed (maybe redundant)
 
         internal ShoeOfDecks(int quantity)
         {
             InitShoeOfDecks(quantity);
         }
 
-        internal IReadOnlyList<Card> Cards => shoe.AsReadOnly(); //AsReadOnly() prevents deleting via casts
+        internal IReadOnlyList<Card> Cards => _shoe.AsReadOnly(); //AsReadOnly() prevents deleting via casts
 
         private void InitShoeOfDecks(int quantity)
         {
-            if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity),"Quantity must be at least 1.");
+            if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity),quantity, "Quantity must be at least 1.");
 
-            counter = 0;
+            _counter = 0;
             int i = 1;
 
-            shoe.Clear();
+            _shoe.Clear();
 
             while (i <= quantity)
             {
@@ -68,7 +78,7 @@ namespace BlackJack
                 {
                     foreach (Rank v in Enum.GetValues<Rank>())
                     {
-                        shoe.Add(new Card(c, v));
+                        _shoe.Add(new Card(c, v));
                     }
                 }
 
@@ -81,21 +91,21 @@ namespace BlackJack
         private void Shuffle()
         {
             //Fisher-Yates-Shuffle reverse
-            for (int i = 0; i <= shoe.Count - 2; i++)
+            for (int i = 0; i <= _shoe.Count - 2; i++)
             {
-                int flag = zufall.Next(i, shoe.Count);
-                Card marked = shoe[i];
-                shoe[i] = shoe[flag];
-                shoe[flag] = marked;
+                int flag = _random.Next(i, _shoe.Count);
+                Card marked = _shoe[i];
+                _shoe[i] = _shoe[flag];
+                _shoe[flag] = marked;
             }
         }
 
 
         internal Card Draw()
         {
-            if (counter >= shoe.Count) throw new InvalidOperationException("No cards available.");
-            counter++;
-            return shoe[counter - 1];
+            if (_counter >= _shoe.Count) throw new InvalidOperationException("No cards available.");
+            _counter++;
+            return _shoe[_counter - 1];
 
         }
 
@@ -132,21 +142,21 @@ namespace BlackJack
 
     internal sealed class Hand
     {
-        private List<Card> _hand;
+        internal Guid HandId { get;}
+        private readonly List<Card> _hand;
+        internal Hand(List<Card> initialCards)
+        {
+            if (initialCards.Count <1)
+                throw new ArgumentException("Initial cards must be at least one.",nameof(initialCards));
+            HandId = Guid.NewGuid();
+            _hand = new List<Card>(initialCards);
+        }
         internal int OptimalPoints => CalculateOptimalPoints();
         internal IReadOnlyList<Card> Cards => _hand.AsReadOnly();
         internal bool IsBust => OptimalPoints > 21;
         internal bool IsBlackJack => OptimalPoints == 21 && _hand.Count == 2;
         internal bool IsSplittable => _hand.Count == 2 &&_hand[0].Rank == _hand[1].Rank ;
-
-        internal Hand(List<Card> initialCards)
-        {
-            if (initialCards == null)
-                throw new ArgumentNullException(nameof(initialCards),"Initial cards must not be null.");
-
-            _hand = new List<Card>(initialCards);
-        }
-
+       
         private int CalculateOptimalPoints()
         {
             int aceCount = 0;
@@ -176,6 +186,8 @@ namespace BlackJack
 
         internal void AddCard(Card card)
         {
+            if (IsBust) throw new InvalidOperationException("No card allowed after bust.");
+            if (IsBlackJack) throw new InvalidOperationException("No card allowed after blackjack.");
             _hand.Add(card);
         }
 
@@ -195,26 +207,30 @@ namespace BlackJack
 
     internal sealed class Bet
     {
-        internal decimal Amount { get; init; }
-        internal Hand? BettedHand { get; init; }
+        internal Guid PlayerId { get; }
+        internal Guid ?HandId { get; }
+        internal decimal Amount { get; }
 
-        internal Bet(decimal amount, Hand? hand = null)
+        internal Bet(decimal amount, Guid playerId, Guid? handId = null)
         {
             if (amount <= 0m)
                 throw new ArgumentOutOfRangeException(nameof(amount),"Bet amount has to be positive.");
+            PlayerId = playerId;
+            HandId = handId;
             Amount = amount;
-            BettedHand = hand;
         }
 
     }
     internal sealed class Player : IUser
     {
-        public string Name { get; init; }
-        public Role Role { get; init; }
+        public Guid PlayerId { get; }
+        public string Name { get; }
+        public Role Role { get; }
         internal decimal Balance { get; private set; }
 
-        internal Player(string name, decimal balance)
+        internal Player(string name, decimal balance, Guid? playerId = null)
         {
+            PlayerId = playerId ?? Guid.NewGuid();
             Name = name;
             Role = Role.Player;
             Balance = balance;
@@ -236,8 +252,8 @@ namespace BlackJack
 
     internal sealed class Operator : IUser
     {
-        public string Name { get; init; }
-        public Role Role { get; init; }
+        public string Name { get; }
+        public Role Role { get;}
 
         internal Operator(string name)
         {
@@ -249,42 +265,92 @@ namespace BlackJack
 
     internal sealed class Box
     {
-        private readonly List<Hand> _hands = new();
+        internal Guid BoxId { get; }
+        private readonly List<Guid> _handIds;
         internal decimal MaxBet { get; private set; }
+
+        internal Box(List<Hand> startHands, decimal maxBet, Guid? boxId = null)
+        {
+            BoxId = boxId ?? Guid.NewGuid();
+            _handIds = new List<Guid>();
+            foreach (var h in startHands)
+            {
+                _handIds.Add(h.HandId);
+            }
+            MaxBet = maxBet;
+        }
 
         internal void SetMaxBet(IUser user, decimal amount)
         {
-            if (user.Role != Role.Operator) throw new UnauthorizedAccessException("Only operator can change maxbet.");
+            if (user.Role != Role.Operator) throw new UnauthorizedAccessException("Only operator can change MaxBet.");
             if (amount <0m) throw new ArgumentOutOfRangeException(nameof(amount),"Placed MaxBet cannot be negative.");
             MaxBet = amount;
         }
 
-        internal void SplitHand(Hand hand)
+        internal void SplitHand(Guid handId, Round round)
         {
+            Hand? hand = round.GetHand(handId);
+            if (hand == null) throw new InvalidOperationException("Hand not found in round.");
+            
             if (!hand.IsSplittable)
                 throw new InvalidOperationException("Hand has to contain exact two cards which have equal rank for split.");
-            if (!_hands.Contains(hand)) throw new InvalidOperationException("Box has to contain target hand for split.");
+           
             Hand newHand = hand.SplitHandOver();
-            _hands.Add(newHand);
+            round.AddHand(newHand);
+            _handIds.Add(newHand.HandId);
 
         }
-        internal IReadOnlyList<Hand> Hands 
+        internal IReadOnlyList<Guid> Hands 
         {
-            get { return _hands.AsReadOnly(); }
+            get { return  _handIds.AsReadOnly(); }
         }
     }
-    
-    ///////////////////////////////////////////////////////// Oben Refactored, unten alt/unfinished.
-   internal interface IGameRules
-   {
-       internal bool CanSurrenderLate(Hand hand, Card upcard);
-   }
 
-   internal static class StandardBjRules
-   {
-      
-   }
-   internal sealed class Decisions
+    internal sealed class Round
+    {
+        internal Guid RoundId { get;}
+        private readonly ShoeOfDecks _shoeOfDecks;
+        private Hand _dealerHand;
+        private readonly List<Hand> _hands;
+        private readonly List<Box> _boxes;
+        private State _state;
+
+        internal Round(Guid? roundId = null)
+        {
+            RoundId = roundId ?? Guid.NewGuid();
+            _shoeOfDecks = new ShoeOfDecks(6);
+            _hands = new List<Hand>();
+            _boxes = new List<Box>();
+        }
+
+        internal Hand CreateHand(List<Card> initialCards)
+        {
+            Hand hand = new Hand(initialCards);
+            _hands.Add(hand);
+            return hand;
+        }
+
+        internal Hand? GetHand(Guid handId)
+        {
+            foreach (var hand in _hands)
+            {
+                if (hand.HandId == handId)
+                {
+                    return hand;
+                }
+            }
+            return null;
+        }
+
+        internal void AddHand(Hand hand)
+        {
+            if (hand == null) throw new ArgumentNullException(nameof(hand));
+            _hands.Add(hand);
+        }
+    }
+    ///////////////////////////////////////////////////////// Oben Refactored, unten alt/unfinished.
+   
+   internal sealed class PlayerCommands
    {
        /*
        public bool PlayerWantsCard(Hand hand)
@@ -316,13 +382,6 @@ namespace BlackJack
 
    }
    
-
-
-
-   internal sealed class Game
-   {
-       //UpCardDealer, PlayPlayerRound, HoleCardDealer, EvaluateWinLoss
-   }
  /////////////////////////////////////////////////////////////////////////////////////////////////////////////
  class Program
     {
@@ -448,11 +507,11 @@ namespace BlackJack
                 new Card(Suit.Spades, Rank.Six),
             });
 
-            if (b1.IsBust != true && b2.IsBust != false)
+            if (b1.IsBust != true || b2.IsBust != false)
                 throw new Exception("IsBust doesn't detect properly.");
             Console.WriteLine("Hand - IsBust test successful.");
             
-            if (a3.IsBlackJack != true && a2.IsBlackJack != false && a1.IsBlackJack != false)
+            if (a3.IsBlackJack != true || a2.IsBlackJack != false || a1.IsBlackJack != false)
                 throw new Exception("IsBlackJack doesn't detect properly.");
             Console.WriteLine("Hand - IsBlackJack test successful.");
             
@@ -482,12 +541,12 @@ namespace BlackJack
                 throw new Exception("CanSplitOnce doesn't detect properly.");
             Console.WriteLine("Hand - CanSplitOnce test successful.");
             */
-            
+
             Hand s4 = new Hand(new List<Card>
             {
                 new Card(Suit.Hearts, Rank.Queen),
                 new Card(Suit.Diamonds, Rank.King),
-                new Card(Suit.Diamonds, Rank.Ace) 
+                new Card(Suit.Diamonds, Rank.Ace)
             });
 
             s3.AddCard(new Card(Suit.Diamonds, Rank.Ace));
@@ -504,8 +563,8 @@ namespace BlackJack
         {
             try
             {
-                Bet a = new Bet(-3);
-                throw new Exception("Expected Exception not throwm");
+                Bet a = new Bet(-3, Guid.NewGuid());
+                throw new Exception("Expected Exception not thrown.");
             }
             catch ( ArgumentOutOfRangeException ex)
             {
@@ -513,7 +572,7 @@ namespace BlackJack
                     throw new Exception("Unexpected exception message.");
             }
             
-                Bet b = new Bet(2);
+                Bet b = new Bet(2, Guid.NewGuid());
             Console.WriteLine("Bet - test successful.");
             
             

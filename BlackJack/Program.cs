@@ -130,7 +130,7 @@ namespace BlackJack
                 case Rank.Queen:
                 case Rank.King: return 10;
                 case Rank.Ace: return 11;
-                default: throw new ArgumentOutOfRangeException(nameof(Rank),"Card rank not valid. Probably illegal new card added in enum");
+                default: throw new ArgumentOutOfRangeException(nameof(Rank),"Card rank not valid. Probably illegal new card added in enum.");
             }
         }
 
@@ -205,18 +205,16 @@ namespace BlackJack
         
     }
 
-    internal sealed class Bet
+    internal readonly record struct Bet
     {
         internal Guid PlayerId { get; }
-        internal Guid ?HandId { get; }
         internal decimal Amount { get; }
 
-        internal Bet(decimal amount, Guid playerId, Guid? handId = null)
+        internal Bet(decimal amount, Guid playerId)
         {
             if (amount <= 0m)
                 throw new ArgumentOutOfRangeException(nameof(amount),"Bet amount has to be positive.");
             PlayerId = playerId;
-            HandId = handId;
             Amount = amount;
         }
 
@@ -563,7 +561,7 @@ namespace BlackJack
         {
             try
             {
-                Bet a = new Bet(-3, Guid.NewGuid());
+                Bet a = new Bet(-3m, Guid.NewGuid());
                 throw new Exception("Expected Exception not thrown.");
             }
             catch ( ArgumentOutOfRangeException ex)
@@ -572,7 +570,7 @@ namespace BlackJack
                     throw new Exception("Unexpected exception message.");
             }
             
-                Bet b = new Bet(2, Guid.NewGuid());
+                Bet b = new Bet(2m, Guid.NewGuid());
             Console.WriteLine("Bet - test successful.");
             
             
